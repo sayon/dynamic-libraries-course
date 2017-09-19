@@ -1,0 +1,170 @@
+%rules to format assembly code (NASM syntax)
+% (c) Igor Zhirkov
+%
+% requires xcolor!
+\lstdefinelanguage{nasm64}{ 
+mathescape=false,
+upquote=true,
+%
+% Comments may or not include Latex commands
+texcl=false, 
+% 
+% data
+morekeywords=[1]{ db, dd, dw, dq, dt, do, dy, dz },
+% unitialized data
+morekeywords=[2]{ resb, resd, resw, resq, rest, reso, resy, resz},
+% common section names .data, .text, .code, .bss, .stack 
+morekeywords=[3]{ .data, .text, .code, .bss, .stack }, 
+% text transformations
+morekeywords=[4]{ equ, times, include, strlen, xdefine, define, macro, endmacro,
+if, ifidn, ifidni, else, elif, endif, assign, rep, endrep, exitrep, line,
+ifid, ifstr, ifnum},
+%x64 commands
+morekeywords=[5]{
+    enter,
+    leave,
+    mov,         
+    movq,
+    movdqa,
+    movdqu,
+    xor,         
+    syscall,     
+    sysret,     
+    ret,         
+    iretq,         
+    int,         
+    call,        
+    neg,
+    not,
+    inc,         
+    dec,
+    add,         
+    sub,         
+    mul,         
+    imul,
+    div,         
+    idiv,
+    lea,         
+    test,        
+    cmp,         
+    jmp,         
+    je,
+    jne,
+    jz,          
+    jnz,         
+    jg,          
+    jge,         
+    jl,          
+    jle,         
+    ja,          
+    jae,         
+    jb,          
+    jbe,         
+    js, 
+    jns,
+    push,        
+    pop,
+    sar,
+    shr,
+    sal,
+    shl,
+    and,
+    or,
+    movsb,
+    movsd,
+    scasb,
+    scasd,
+    rdmsr,
+    wrmsr,
+    vbroadcastss,
+    movsd,
+    movdqa,
+    movdqu,
+    mulps,
+    addps,
+    mulpd,
+    haddps,
+    shufps,
+    unpcklps,
+    packswb,
+    cvtdq2pd,
+    mulsd,
+    mfence,
+    sfence,
+    lfence,
+    rep,
+    movs
+},               
+%x64 gp registers
+morekeywords=[6]{rax, rbx, rcx, rdx, rsi, rdi, rsp, rbp, r0, r1, r2, r3,
+r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15,  eax, ebx, ecx, edx, esp,
+ebp, esi, edi,ax, bx, cx, dx, sp, bp, si, di, ah, al, bh, bl, ch, cl, dh, dl,
+rip,eip, ip, rflags, eflags, flags},
+%x64 segment registers
+morekeywords=[7]{cs, ds, ss, es, gs, fs},
+%x64 service registers
+morekeywords=[8]{cr0, cr1, cr4, cr5, cr6, cr7, cr8, efer, idtr, gdtr, ldtr, tr},
+%
+morekeywords=[9]{section, global, extern, bits, wrt, rel, got, plt}, 
+%
+% Comments delimiters, we do turn this off for the manual
+morecomment=[l]{;},
+%
+morecomment=[s]{(*}{*)},
+% Spaces are not displayed as a special character
+showstringspaces=false,
+%
+% String delimiters
+morestring=[b]",
+morestring=[d]',
+%
+% Size of tabulations
+tabsize=3,
+%
+% Enables ASCII chars 128 to 255
+extendedchars=true,
+%
+% Case sensitivity
+sensitive=false,
+%
+% Automatic breaking of long lines
+breaklines=false,
+%%%
+% Default style fors listings
+basicstyle=\ttfamily , 
+%
+% flexible columns
+%columns=[l]flexible,
+% 
+identifierstyle={\color{Blue}}, 
+keywordstyle=[1]{\color{DarkOrchid}}, 
+keywordstyle=[2]{\color{darkelectricblue}}, 
+keywordstyle=[3]{\color{ltblue}}, 
+keywordstyle=[4]{\color{Maroon}}, 
+keywordstyle=[5]{\color{CadetBlue}},
+keywordstyle=[6]{\color{black}},
+keywordstyle=[7]{\color{black}},
+keywordstyle=[8]{\color{black}}, 
+keywordstyle=[9]{\color{antiquefuchsia}}, 
+stringstyle={\color{Fuchsia}\ttfamily}, 
+commentstyle={\color{battleshipgrey}\ttfamily}  
+}[keywords,comments,strings]
+ 
+\def\asm{\lstinline[language=nasm64]}
+
+\lstnewenvironment{asmexample}
+{\lstset{language=nasm64, frame=none}}
+{}
+
+\newcommand{\asminput}[2]{
+    \lstinputlisting[language=nasm64, 
+    label={lst:\detokenize{#1}.asm}, 
+caption={~\detokenize{#2} \texttt{\detokenize{#1}.asm}}]{\lstcurrentinputdir/#1/#1.asm}
+}
+\newcommand{\asminputlines}[4]{ 
+    \lstinputlisting[language=nasm64, 
+    caption={~\detokenize{#2} \texttt{\detokenize{#1}.asm}}, 
+firstline=#3, lastline=#4, firstnumber=#3]{\lstcurrentinputdir/#1/#1.asm}
+}
+
+\newcommand{\lstcurrentinputdir}{listings}

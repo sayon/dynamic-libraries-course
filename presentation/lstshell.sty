@@ -1,0 +1,32 @@
+%rules to format bash
+% (c) Igor Zhirkov
+%
+% requires xcolor!
+
+\lstdefinestyle{shell}{frame=none,
+                basicstyle=\ttfamily,
+                upquote=true,
+                morecomment=[l][\color{Gray}]{\#}
+                %keywordstyle=\color{DarkOrchid}\ttfamily,
+                %identifierstyle=\color{Blue}\ttfamily,
+                %stringstyle={\color{Fuchsia}\ttfamily},
+                %commentstyle={\color{Gray}\ttfamily},
+            %morecomment=[l][\color{Gray}]{\#}
+        }
+
+\lstnewenvironment{shell}
+{\lstset{style=shell}}
+{}
+ 
+  
+\newcommand{\shellinput}[2]{
+\lstinputlisting[style=shell,
+    label={lst:\detokenize{#1}}, 
+    caption={\detokenize{#2} \texttt{\detokenize{#1}}}]{\lstcurrentinputdir/#1/#1}
+        }
+
+
+
+\def\sh{\lstinline[style=shell
+%,style=customc
+]} 
