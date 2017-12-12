@@ -311,21 +311,23 @@ Can be:
         \begin{itemize}
             \item  File header 
                 \begin{itemize}
-                    \item  Main header
-                    \item  General info
+                    \item  General info.
                     \item  Links to Program and Section headers.
                 \end{itemize} 
             \item  Section header
                 \begin{itemize}
                     \item Information about \textbf{sections}.
-                    \item Each section stores code or meta-information 
+                    \item Each section stores code or meta-information.
+                    \item Needed for linking.
                 \end{itemize} 
             \item  Program header
                 \begin{itemize}
-
+                    \item  Instructions on how to create process image.
                     \item  Information about \textbf{segments}.
-                    \item  Each segment is a region in virtual memory, 
-                        loaded with one or more sections.
+                    \item  Segment is a virtual memory region;
+                        contains some sections.
+
+                    \item Needed for execution.
                 \end{itemize} 
         \end{itemize} 
 \end{frame}
@@ -346,6 +348,10 @@ Typical sections:
                 \item \textbf{.data}
                 \item \textbf{.text} -- compiled instructions.
                 \item \textbf{.rodata} -- read only data.
+                \item \textbf{.bss} -- zero-initialized data (only size).
+                \item \textbf{.line} -- line numbers in source code.
+                \item \textbf{.symtab} -- all symbols from source code.
+
             \end{itemize} 
 
         }
@@ -355,20 +361,19 @@ Typical sections:
 \begin{frame}[fragile]{Exemplary program}
   
     \begin{asmexample}
-section .data
-datavar1: dq 1488
-datavar2: dq datavar1
+section .data         ; global variables:
+x dq 148842           ; int  x = 148842
+y dq datavar1         ; int* y = &x
 
-extern somewhere 
-global _start
+extern somewhere      ; an external symbol 
+global _start         ; visible to other modules
 
-section .text
-    mov rax, datavar1
-    mov rax, bssvar1
-    mov rax, bssvar2 
-    mov rdx, datavar2
+section .text         ; code:  {
+  _start: 
+    mov rax, x        ; rax := &x
+    mov rdx, y        ; rdx := &y
 
-_start: jmp _start
+  jmp _start          ; } while (true);
     \end{asmexample}
 
 \end{frame}
@@ -377,20 +382,20 @@ _start: jmp _start
 \begin{frame}[fragile]{ELF File Header}
 
     \begin{shell}
-> nasm -f elf64 hello.asm -o hello.o
-> ld -o hello hello.o
-> readelf -h  hello
+> nasm -f elf64 symb.asm -o symb.o  # compile 
+> ld -o symb symb.o                 # link
+> readelf -h  symb             # view file header
     \end{shell}
 
 Class:                             ELF64
 
 Type:                              EXEC (Executable file)
 
-Entry point address:               0x4000b0
+Entry point address:               0x4000c0
 
-Start of program headers:          64 (bytes into file)
+Start of program headers:          56 (bytes into file)
 
-Start of section headers:          552 (bytes into file)
+Start of section headers:          584 (bytes into file)
 
 Number of program headers:         2
 
@@ -398,6 +403,31 @@ Number of section headers:         6
 \end{frame}
 
 
+\begin{frame}[fragile]{Sections -- before linking}
+    \begin{shell}
+> readelf -S symb.o
+    \end{shell}
+
+{\small
+\setlength{\parindent}{-0.5cm}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{l l l l l l l l l l }
+\textbf{Name}& \textbf{Type} & \textbf{Address} & \textbf{Offset} & \textbf{Size}& \textbf{EntSize} & \textbf{Flags} & \textbf{Link} & \textbf{Info} & \textbf{Align} \\
+.data & PROGBITS   & 0 & 240  & 10 & 0 & WA & 0 & 0 & 4 \\
+.text & PROGBITS   & 0 & 250  & 16 & 0 & AX & 0 & 0 & 16 \\
+.shstrtab & STRTAB & 0 & 270  & 3d & 0 & 0  & 0 & 0 & 1  \\
+.symtab   & SYMTAB & 0 & 2b   & c0 & 18& 0  & 5 & 6 & 4  \\
+.strtab   & STRTAB & 0 & 370  & 2d & 0 & 0  & 0 & 0 & 1  \\
+.rela.data& RELA   & 0 & 3a0  & 18 & 18& 0  & 4 & 1 & 4 \\
+.rela.text& RELA   & 0 & 3c0  & 30 & 18& 0  & 4 & 2 & 4 \\
+
+\end{tabular}
+}
+\pause
+    \begin{itemize}
+        \item  All addresses are 0
+    \end{itemize}
+\end{frame}
 
 \begin{frame}{Mapping sections into memory}
    
