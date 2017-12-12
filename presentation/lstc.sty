@@ -90,8 +90,10 @@ commentstyle={\color{sbase0}\ttfamily}
                 stringstyle={\color{c1}\ttfamily},
                 commentstyle={\color{commentgreengray}\ttfamily},
                 directivestyle={\color{c3}\ttfamily},
-                showspaces=false, showtabs=false,showstringspaces=false
-            morecomment=[l][]{\#}}
+                showspaces=false, showtabs=false,showstringspaces=false,
+                morecomment=[l][]{\#},
+                moredelim={**[is][\btHL<1>]{@}{@}} 
+            }
 
 \lstnewenvironment{cexample}
 {\lstset{language={cc}

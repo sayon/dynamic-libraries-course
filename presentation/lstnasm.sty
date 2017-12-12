@@ -2,6 +2,12 @@
 % (c) Igor Zhirkov
 %
 % requires xcolor!
+
+\definecolor{darkpastelblue}{rgb}{0.47, 0.62, 0.8}
+\definecolor{darkelectricblue}{rgb}{0.33, 0.41, 0.47}
+\definecolor{antiquefuchsia}{rgb}{0.57, 0.36, 0.51}
+\definecolor{battleshipgrey}{rgb}{0.52, 0.52, 0.51}
+
 \lstdefinelanguage{nasm64}{ 
 mathescape=false,
 upquote=true,
@@ -28,7 +34,6 @@ morekeywords=[5]{
     movdqa,
     movdqu,
     xor,         
-    syscall,     
     sysret,     
     ret,         
     iretq,         
@@ -147,7 +152,8 @@ keywordstyle=[7]{\color{black}},
 keywordstyle=[8]{\color{black}}, 
 keywordstyle=[9]{\color{antiquefuchsia}}, 
 stringstyle={\color{Fuchsia}\ttfamily}, 
-commentstyle={\color{battleshipgrey}\ttfamily}  
+commentstyle={\color{battleshipgrey}\ttfamily},
+moredelim={**[is][\btHL<1>]{@}{@}}
 }[keywords,comments,strings]
  
 \def\asm{\lstinline[language=nasm64]}

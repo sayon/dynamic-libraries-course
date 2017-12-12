@@ -15,7 +15,44 @@
 
 \usepackage{lstc}
 \usepackage{lstnasm}
+\usepackage{lstshell}
 \renewcommand{\lstcurrentinputdir}{listings}
+
+\usepackage{tikz}
+\usetikzlibrary{arrows,
+decorations.pathmorphing,backgrounds,fit,positioning,shapes.symbols,chains,
+positioning,automata,positioning,calc}
+
+\tikzset{onslide/.code args={<#1>#2}{%
+  \only<#1>{\pgfkeysalso{#2}} % \pgfkeysalso doesn't change the path
+}}
+
+\makeatletter
+\newenvironment<>{btHighlight}[1][]
+{\begin{onlyenv}#2\begingroup\tikzset{bt@Highlight@par/.style={#1}}\begin{lrbox}{\@tempboxa}}
+{\end{lrbox}\bt@HL@box[bt@Highlight@par]{\@tempboxa}\endgroup\end{onlyenv}}
+
+\newcommand<>\btHL[1][]{%
+  \only#2{\begin{btHighlight}[#1]\bgroup\aftergroup\bt@HL@endenv}%
+}
+
+
+\def\bt@HL@endenv{%
+  \end{btHighlight}%   
+  \egroup
+}
+
+\newcommand{\bt@HL@box}[2][]{%
+  \tikz[#1]{%
+    \pgfpathrectangle{\pgfpoint{1pt}{0pt}}{\pgfpoint{\wd #2}{\ht #2}}%
+    \pgfusepath{use as bounding box}%
+    \node[anchor=base west, fill=orange!30,outer sep=0pt,inner xsep=1pt, inner ysep=0pt, rounded corners=3pt, minimum height=\ht\strutbox+1pt,#1]{\raisebox{1pt}{\strut}\strut\usebox{#2}};
+  }%
+}
+
+\makeatother
+
+
 
 %settings 
 \everymath{\displaystyle}
@@ -25,19 +62,25 @@
 \author{I.Zhirkov}
 
 \date{2017}
-
-%\AtBeginSection[]{
-%    \begin{frame}<beamer>{}
-%        {\huge \secname}
-%    \end{frame}
-%}
-\AtBeginSection[]
-{
-  \begin{frame}<beamer>{\secname}
-    \tableofcontents[currentsection, currentsubsection,
-      subsectionstyle=show/show/hide, sectionstyle=show/show]
+\AtBeginSection[]{
+  \begin{frame}
+  \vfill
+  \centering
+  \begin{beamercolorbox}[sep=8pt,center,shadow=false,rounded=false]{title}
+    \usebeamerfont{title}\insertsectionhead\par%
+  \end{beamercolorbox}
+  \vfill
   \end{frame}
 }
+
+
+%\AtBeginSection[]
+%{
+%  \begin{frame}<beamer>{\secname}
+%    \tableofcontents[currentsection, currentsubsection,
+%      subsectionstyle=show/show/hide, sectionstyle=show/show]
+%  \end{frame}
+%}
 
 
 \iffalse
@@ -63,6 +106,8 @@
 \end{frame}
 
 
+
+
 \begin{frame}{Exemplary environment}
     \begin{itemize} 
         \item  Intel 64 aka AMD64 aka x86\_64.
@@ -72,25 +117,29 @@
 \end{itemize} 
 \end{frame}
 
+\begin{frame}{Contents}
+\tableofcontents
 
-\section{What is linking?}
-\subsection{Compilation}
+\end{frame}
+
+\section{Preface}
+\subsection{Relocation}
 
 \begin{frame}{\subsecname}
     \begin{itemize}
- \item  Compiling code is not trivial.
+ \item  Compiling is not trivial.
  \item  One of challenges -- carefully placing code and data in memory.
 \end{itemize} 
 \end{frame}
 
 \begin{frame}[fragile]{Example}
 
-    \begin{tabular}{p{5.3cm} c}
+    \begin{tabular}{p{5.3cm} l}
         {
         
 \begin{cexample}
 int x;
-int y;
+int* y = &x;
 
 void f() {
     x = x + 1;
@@ -102,15 +151,26 @@ void f() {
        
 \begin{itemize}
     \item  Where to place \c{x} and \c{y}?
-    \item  Instructions need to know data addresses. 
+    \item  Code and data require knowing addresses. 
     \item  \emph{Once an address is picked, it is difficult to change.}
 \end{itemize}
 
         }
 
         }&{
-            \raisebox{-\height}{\includegraphics[scale=0.3]{images/relocation-1.png}}
+            \raisebox{-\height}{\includegraphics[scale=0.3]{images/relocation-1.png}
+
+       ~
+
+       ~
+
         }
+
+
+        }
+        \\
+        & 
+        \only<1>{\small{ {\color{red} red} -- depends on positioning}} 
     \end{tabular}
 
 \end{frame}
@@ -119,13 +179,21 @@ void f() {
 
 \begin{frame}{Solution: linking stage}
     \begin{itemize}
- 
-\item  Defer placement until the last stage of compilation.
-    \begin{itemize}
- \item  Instructions generated, we know all functions and global variables.
-    \end{itemize} 
-\item  Program entities which make sense for linking are called \textbf{symbols}.
+
+        \item Last stage of compilation: linking.
+        \item  Defer placement until linking.
+            \begin{itemize}
+                \item  Instructions generated, we know all functions and global variables.
+            \end{itemize} 
+        \item  \textbf{Symbol} -- program entities which are useful for linking.
+            \begin{itemize}
+                \item Global variables.
+                \item Functions.
+                \item Utility symbols.
+            \end{itemize} 
 \end{itemize} 
+    
+    
 
 \end{frame}
 
@@ -136,16 +204,16 @@ void f() {
 For each symbol we know its:
     \begin{itemize}
 
-        \item  Name
-        \item  Address if assigned
-        \item  Where it is referenced.
+        \item  Name.
+        \item  Address if assigned.
+        \item  Locations where referenced.
 \end{itemize} 
      Assigning addresses to symbols is called \textbf{relocation}.
 
 \begin{cexample}
 int x;          // symbol 'x'
 
-void f() {      // symbol 'f'
+void func() {      // symbol 'f'
     x = x + 1;  // symbol 'x' referenced
 }
 \end{cexample}
@@ -153,17 +221,25 @@ void f() {      // symbol 'f'
 
 \end{frame}
 
-\begin{frame}{Need for separate compilation}
+\subsection{Linker}
+\begin{frame}{\subsecname}
+    
+    \textbf{Linker} is a program that assigns addresses to symbols and finalizes
+    compilation.
+    
+    Allows for separate compilation, which we need:
+    
     \begin{itemize}
-        \item Most useful programs are too big for one file (should split into modules.
-        \item Need to use code that is already compiled (libraries).
-        \item  Don't recompile everything after each change (debug time explodes).
+        \item Programs too big for one file (split into modules).
+        \item Using already compiled code (libraries).
+        \item Fast debugging (each change invokes recompilation).
             \begin{itemize}
-                \item  Some programs take \emph{hours} to compile.
+                \item  Some programs take \emph{hours} to compile from scratch.
             \end{itemize}
     \end{itemize} 
 
 \end{frame}
+
 
 
 \begin{frame}{Compilation pipeline}
@@ -171,39 +247,187 @@ void f() {      // symbol 'f'
 \end{frame}
 
 
-\begin{frame}{Compiling separately vs all at once}
-
-\end{frame}
-
-\begin{frame}{Particular interest}
-
-\begin{itemize}
-    \item  Separate compilation.
-    \item  Using a separate program (linker) on the final stage.
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Why we need separate compilation?}
-\begin{itemize}
-    \item  Use code that is already compiled (libraries).
-    \item  Don't recompile everything after each change (debug time explodes).
-
-    \begin{itemize}
-        \item  Some programs take \emph{hours} to compile.
-    \end{itemize}
+\begin{frame}[fragile]{Modules and objects}
+    Compiler works with atomic code entities called \textbf{modules}.
+   
+    In C, module is a \sh{.c} file.
     
-\end{itemize}
+    Modules are transformed into \textbf{object files}.
+    
+Object files are structured and contain translated instructions.
+
+
+\end{frame}
+
+\begin{frame}{ELF object files}
+\textbf{ELF} -- Executable and Linkable Format, typical for *nix systems.
+
+Can be:
+
+\begin{enumerate}
+\item \textbf{Relocatable} object files
+    
+    {\small \texttt{.o}-files, produced by compiler, not linked.}
+
+    {\small Same as \textbf{static libraries}}.
+
+\item \textbf{Executable} object file 
+    
+    {\small program after linking, ready-to-run.}
+
+\item \textbf{Shared} 
+   
+    {\small \texttt{.so}, dynamic libraries, to be linked in runtime.}
+
+\end{enumerate}
+
+    \begin{description}
+        \item[Static linker] transforms 1 into 2 or 3.
+        \item[Dynamic linker] prepares 3 for execution.
+    \end{description}
+
 \end{frame}
 
 
-\begin{frame}
+\section{Static linking}
+
+\subsection{ELF format}
+
+
+\begin{frame}{Toolset}
+    Tools to examine object files:
+    \begin{itemize}
+\item  \sh{readelf} -- perfect for ELF files
+\item  \sh{objdump} -- general purpose, disassembler
+\item  \sh{nm} -- only symbols.
+\end{itemize} 
+
+    Stick with \sh{readelf}, use \sh{objdump} for disassembly.
 
 \end{frame}
+
+\begin{frame}{ELF file structure}
+        Three headers:
+        \begin{itemize}
+            \item  File header 
+                \begin{itemize}
+                    \item  Main header
+                    \item  General info
+                    \item  Links to Program and Section headers.
+                \end{itemize} 
+            \item  Section header
+                \begin{itemize}
+                    \item Information about \textbf{sections}.
+                    \item Each section stores code or meta-information 
+                \end{itemize} 
+            \item  Program header
+                \begin{itemize}
+
+                    \item  Information about \textbf{segments}.
+                    \item  Each segment is a region in virtual memory, 
+                        loaded with one or more sections.
+                \end{itemize} 
+        \end{itemize} 
+\end{frame}
+
+
+\begin{frame}[fragile]
+    \begin{tabular}{p{5cm} p{5cm}}
+       
+            
+            \raisebox{-\height}{\includegraphics[scale=0.3]{images/elf-structure-general.png}}
+            
+        & {
+            ~
+
+Typical sections:
+            
+            \begin{itemize}
+                \item \textbf{.data}
+                \item \textbf{.text} -- compiled instructions.
+                \item \textbf{.rodata} -- read only data.
+            \end{itemize} 
+
+        }
+    \end{tabular}
+\end{frame}
+
+\begin{frame}[fragile]{Exemplary program}
+  
+    \begin{asmexample}
+section .data
+datavar1: dq 1488
+datavar2: dq datavar1
+
+extern somewhere 
+global _start
+
+section .text
+    mov rax, datavar1
+    mov rax, bssvar1
+    mov rax, bssvar2 
+    mov rdx, datavar2
+
+_start: jmp _start
+    \end{asmexample}
+
+\end{frame}
+
+
+\begin{frame}[fragile]{ELF File Header}
+
+    \begin{shell}
+> nasm -f elf64 hello.asm -o hello.o
+> ld -o hello hello.o
+> readelf -h  hello
+    \end{shell}
+
+Class:                             ELF64
+
+Type:                              EXEC (Executable file)
+
+Entry point address:               0x4000b0
+
+Start of program headers:          64 (bytes into file)
+
+Start of section headers:          552 (bytes into file)
+
+Number of program headers:         2
+
+Number of section headers:         6
+\end{frame}
+
+
+
+\begin{frame}{Mapping sections into memory}
+   
+    \includegraphics[scale=0.28]{images/segments-to-memory.png}
+\end{frame}
+\iffalse
+
+Start with studying ELF format because it is illustrative
+Structure of object files
+Sections, Segments 
+show symbol tables, relocation
+practice: needed tools, Example C, Example ASM
+
+Shared libraries 
+\fi
+
+
+
 %\begin{frame}[allowframebreaks]
 %\frametitle{References}
 %\bibliography{biblio} 
 %\end{frame}
 
+
+\iffalse
+Litterature:
+my book
+ABI
+Ulrich drepper
+\fi
 \end{document}
 
 
