@@ -17,6 +17,7 @@
 \usepackage{lstnasm}
 \usepackage{lstshell}
 \renewcommand{\lstcurrentinputdir}{listings}
+\usepackage{multirow}
 
 \usepackage{tikz}
 \usetikzlibrary{arrows,
@@ -71,6 +72,11 @@ positioning,automata,positioning,calc}
   \end{beamercolorbox}
   \vfill
   \end{frame}
+
+%\begin{frame}
+%    \tableofcontents[currentsubsection,
+%      subsectionstyle=show/hide/show, sectionstyle=hide/hide]
+%\end{frame}
 }
 
 
@@ -83,21 +89,6 @@ positioning,automata,positioning,calc}
 %}
 
 
-\iffalse
-Этот мини-курс посвящен устройству динамических библиотек на низком уровне в современном 64-разрядном окружении. Будут рассмотрены следующие вопросы:
-
-— Зачем нужен компоновщик и динамический загрузчик. 
-— Релокация. 
-— Структура ELF-файлов: секции, сегменты. Таблицы символов. 
-— Отличие статического и динамического связывания. 
-— Position Independent Code.
-— Global Offset Table и Program Linkage Table. 
-— Как описывается интерфейс динамических библиотек. 
-— Процесс разрешения символов. 
-— Оптимизация динамических библиотек. 
-— Small, Medium, Large Code Models и как они изменяются в условиях Position Independent Code. 
-
-\fi
 
 \begin{document}
 
@@ -127,8 +118,12 @@ positioning,automata,positioning,calc}
 
 \begin{frame}{\subsecname}
     \begin{itemize}
- \item  Compiling is not trivial.
- \item  One of challenges -- carefully placing code and data in memory.
+ \item  Compiling is not trivial.  
+
+ \item  Random Access Memory, linear addresses.  
+
+ \item  Challenge: carefully placing code and data in memory.
+
 \end{itemize} 
 \end{frame}
 
@@ -187,8 +182,12 @@ void f() {
             \end{itemize} 
         \item  \textbf{Symbol} -- program entities which are useful for linking.
             \begin{itemize}
-                \item Global variables.
-                \item Functions.
+                \item Anything with an absolute address 
+                    \begin{itemize}
+
+                        \item Global variables.
+                        \item Functions.
+                    \end{itemize}
                 \item Utility symbols.
             \end{itemize} 
 \end{itemize} 
@@ -203,9 +202,8 @@ void f() {
 
 For each symbol we know its:
     \begin{itemize}
-
         \item  Name.
-        \item  Address if assigned.
+        \item  Address (if assigned).
         \item  Locations where referenced.
 \end{itemize} 
      Assigning addresses to symbols is called \textbf{relocation}.
@@ -213,7 +211,7 @@ For each symbol we know its:
 \begin{cexample}
 int x;          // symbol 'x'
 
-void func() {      // symbol 'f'
+void func() {   // symbol 'f'
     x = x + 1;  // symbol 'x' referenced
 }
 \end{cexample}
@@ -250,7 +248,7 @@ void func() {      // symbol 'f'
 \begin{frame}[fragile]{Modules and objects}
     Compiler works with atomic code entities called \textbf{modules}.
    
-    In C, module is a \sh{.c} file.
+    In C and assembly, a module corresponds to a  \sh{.c} or \sh{.asm} file.
     
     Modules are transformed into \textbf{object files}.
     
@@ -265,13 +263,13 @@ Object files are structured and contain translated instructions.
 Can be:
 
 \begin{enumerate}
-\item \textbf{Relocatable} object files
+\item \textbf{Relocatable} 
     
     {\small \texttt{.o}-files, produced by compiler, not linked.}
 
     {\small Same as \textbf{static libraries}}.
 
-\item \textbf{Executable} object file 
+\item \textbf{Executable} 
     
     {\small program after linking, ready-to-run.}
 
@@ -291,18 +289,22 @@ Can be:
 
 \section{Static linking}
 
-\subsection{ELF format}
+\subsection{ELF overview}
 
 
 \begin{frame}{Toolset}
     Tools to examine object files:
     \begin{itemize}
-\item  \sh{readelf} -- perfect for ELF files
-\item  \sh{objdump} -- general purpose, disassembler
+\item  \sh{readelf} -- ELF meta-information 
+\item  \sh{objdump} -- meta-information of any format, disassembler
 \item  \sh{nm} -- only symbols.
 \end{itemize} 
 
-    Stick with \sh{readelf}, use \sh{objdump} for disassembly.
+What we use:
+    \begin{itemize}
+        \item  \sh{objdump} usually, less specific
+        \item \sh{readelf} for verbose ELF structure
+    \end{itemize} 
 
 \end{frame}
 
@@ -330,6 +332,8 @@ Can be:
                     \item Needed for execution.
                 \end{itemize} 
         \end{itemize} 
+
+        {\small \textbf{Memory region} -- consecutive memory pages with same permissions.}
 \end{frame}
 
 
@@ -347,11 +351,11 @@ Typical sections:
             \begin{itemize}
                 \item \textbf{.data}
                 \item \textbf{.text} -- compiled instructions.
-                \item \textbf{.rodata} -- read only data.
-                \item \textbf{.bss} -- zero-initialized data (only size).
+                \item \textbf{.rodata} -- read only.
+                \item \textbf{.bss} -- zero-initialized data (only size is stored).
                 \item \textbf{.line} -- line numbers in source code.
-                \item \textbf{.symtab} -- all symbols from source code.
-
+                \item \textbf{.symtab} -- symbol table.  
+                \item \dots
             \end{itemize} 
 
         }
@@ -362,8 +366,8 @@ Typical sections:
   
     \begin{asmexample}
 section .data         ; global variables:
-x dq 148842           ; int  x = 148842
-y dq datavar1         ; int* y = &x
+x: dq 148842           ; int  x = 148842
+y: dq x                ; int* y = &x
 
 extern somewhere      ; an external symbol 
 global _start         ; visible to other modules
@@ -382,7 +386,7 @@ section .text         ; code:  {
 \begin{frame}[fragile]{ELF File Header}
 
     \begin{shell}
-> nasm -f elf64 symb.asm -o symb.o  # compile 
+> nasm -f elf64 -o symb.o symb.asm  # compile 
 > ld -o symb symb.o                 # link
 > readelf -h  symb             # view file header
     \end{shell}
@@ -402,7 +406,452 @@ Number of program headers:         2
 Number of section headers:         6
 \end{frame}
 
+\subsection{Sections in relocatable file}
 
+\begin{frame}[fragile]{Sections -- before linking}
+    \begin{shell}
+> objdump -h symb.o
+    \end{shell}
+
+{
+%\setlength{\parindent}{-0.5cm}
+\setlength{\tabcolsep}{12pt}
+
+    \begin{tabular}{l  l  l  l  l  l }
+        \textbf{No}  &  \textbf{Name} & \textbf{Size} & \textbf{Address} & \textbf{Offset} & \textbf{Align} \\\hline
+        1 & .data  &      0x10 & 0& 0x240 & 4 \\
+        \multicolumn{6}{r}{\small \textsc{ contents, alloc, load, reloc, data}} \\
+\hline
+        2 & .text &      0x16& 0& 0x250 & 16 \\
+        \multicolumn{6}{r}{\small \textsc{contents, alloc, load, reloc, readonly, code}}\\
+\hline
+    \end{tabular} 
+}
+\pause
+    \begin{itemize}
+        \item Stubs for addresses.
+        \item Offset from file start.
+        \item \texttt{objdump} omits excess information.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Sections -- before linking}
+
+    \sh{readelf} is more verbose.
+
+    \begin{shell}
+> readelf -S symb.o
+    \end{shell}
+
+{\small
+\setlength{\parindent}{-0.5cm}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{l l l l l l l l l l }
+\textbf{Name}& \textbf{Type} & \textbf{Address} & \textbf{Offset} & \textbf{Size}& \textbf{EntSize} & \textbf{Flags} & \textbf{Link} & \textbf{Info} & \textbf{Align} \\
+\hline
+.data & PROGBITS   & 0 & 240  & 10 & 0 & WA & 0 & 0 & 4 \\
+.text & PROGBITS   & 0 & 250  & 16 & 0 & AX & 0 & 0 & 16 \\
+.shstrtab & STRTAB & 0 & 270  & 3d & 0 & 0  & 0 & 0 & 1  \\
+.symtab   & SYMTAB & 0 & 2b   & c0 & 18& 0  & 5 & 6 & 4  \\
+.strtab   & STRTAB & 0 & 370  & 2d & 0 & 0  & 0 & 0 & 1  \\
+.rela.data& RELA   & 0 & 3a0  & 18 & 18& 0  & 4 & 1 & 4 \\
+.rela.text& RELA   & 0 & 3c0  & 30 & 18& 0  & 4 & 2 & 4 \\
+\hline
+\end{tabular}
+}
+
+    \sh{.symtab} stores the symbol table.
+    
+    \sh{.rela.<section-name>} store relocations.
+\end{frame}
+
+
+\begin{frame}[fragile]{Symbol table}
+  
+
+\begin{shell}
+> objdump -tf symb.o 
+start address 0x0
+\end{shell}
+
+{
+\setlength{\tabcolsep}{10pt}
+    \begin{tabular}{l l l l}
+
+\textbf{Address}& \textbf{Type} & \textbf{Section} & \textbf{Name} \\
+\hline
+    0x0 &  \texttt{l    df} & *ABS*  &  symb.asm\\
+    0x0 &  \texttt{l    d } & .data  &  .data\\
+    0x0 &  \texttt{l    d } & .text  & .text\\
+    0x0 &  \texttt{l      } & .data  &  x\\
+    0x8 &  \texttt{l      } & .data  &  y\\
+    0x0 &  \texttt{       } & *UND*  &  somewhere\\
+    0x0 &  \texttt{g      } & .text  & \_start\\
+\hline
+\end{tabular}
+
+}
+\begin{itemize}
+\item[\texttt{l}] --  local
+
+\item[\texttt{g}] --  global (visible to other object files)
+
+\item[\texttt{d}] --  debug symbol
+
+\item[\texttt{f}] --  file name  
+
+\end{itemize}
+
+\end{frame}
+
+
+\begin{frame}{Symbols before linking}
+    \begin{itemize}
+
+        \item  Addresses are relative to section starts
+        \item  Utility symbols are marked as debug
+        \item  External symbols are in \textsc{*UND*} section
+        \item  \textsc{*ABS*} as ``unrelated to sections''.
+
+\end{itemize} 
+\end{frame}
+
+
+\begin{frame}[fragile]{Stubs are also in code}
+    
+    {\usebeamerfont{title} Source }
+
+\begin{asmexample}
+  _start: 
+    mov rax, x        
+    mov rdx, y        
+  jmp _start          
+\end{asmexample}
+
+    {\usebeamerfont{title} Disassembly }
+\begin{shell}
+> objdump -d -mintel-mnemonic symb.o
+\end{shell}
+
+\begin{asmexample}
+0000000000000000 <_start>:
+   0:   48 b8 @00 00 00 00 00@    mov rax, @0x0@
+   7:   @00 00 00@ 
+   a:   48 ba @00 00 00 00 00@    mov rdx, @0x0@
+  11:   @00 00 00@ 
+\end{asmexample}
+
+\end{frame}
+
+
+\begin{frame}[fragile]{Relocations}
+    \begin{itemize}
+        \item  We need to keep track of the stubs.
+        \item  Sections of interest: \textbf{.data}, \textbf{.rodata}, \textbf{.text}.
+    \end{itemize} 
+
+
+\begin{shell}
+> objdump -r symb.o
+\end{shell}
+
+    \begin{tabular}{p{7cm} l }
+        {
+Relocations in .data:
+
+    \begin{tabular}{ l l l }
+        \textbf{Offset} & \textbf{Type} & \textbf{Value} \\
+        \hline
+        0x8 & \texttt{R\_X86\_64\_64} & .data \\
+        \hline
+    \end{tabular}
+
+} & {
+
+\begin{asmexample}
+
+
+x: dq 148842 
+y: dq x
+\end{asmexample}
+        } \\
+        {
+Relocations in .text:
+
+    \begin{tabular}{ l l l }
+        \textbf{Offset} & \textbf{Type} & \textbf{Value} \\
+        \hline
+        0x2 & \texttt{R\_X86\_64\_64} & .data \\
+        0xc & \texttt{R\_X86\_64\_64} & .data+0x8 \\
+        \hline
+    \end{tabular}
+}
+        & {
+
+\begin{asmexample}
+
+
+mov rax, x
+mov rdx, y
+\end{asmexample}
+
+
+
+        }
+    \end{tabular}
+
+\end{frame}
+
+\subsection{Sections in linked file}
+
+\begin{frame}
+SECTIONS IN LINKED FILE
+\end{frame}
+
+
+\begin{frame}
+SYMBOL TABLE IN LINKED FILE 
+\end{frame}
+
+
+\subsection{Segments}
+
+\begin{frame}
+    ONLY AFTER STATIC LINKING
+
+    WHAT ARE SEGMENTS CAPABLE OF (SEE ELF MANUAL)
+
+\end{frame}
+
+\begin{frame}{Program headers}
+    USING OBJDUMP TO SEE SEGMENTS
+\end{frame}
+
+\begin{frame}{Mapping sections into memory}
+    \includegraphics[scale=0.28]{images/segments-to-memory.png}
+\end{frame}
+
+\subsection{Static linking: summary}
+\begin{frame}{\subsecname}
+
+    {\usebeamerfont{title} Compiler }
+
+    \begin{itemize}
+        \item  Generates code with stubs for absolute addresses.
+        \item  Generates relocation tables for sections in need.
+\end{itemize} 
+
+    {\usebeamerfont{title} Static linker }
+    \begin{itemize}
+        \item Relocates pieces of code and data.
+        \item Creates program header table. 
+        \item Fills in stubs found in relocation tables.
+    \end{itemize} 
+\end{frame}
+
+\section{Shared libraries}
+
+\subsection{What are dynamic libraries?}
+
+\begin{frame}{\subsecname}
+PAGE 103
+
+\end{frame}
+
+\subsection{Advantages and disadvantages}
+\begin{frame}{\subsecname}
+PAGE 103
+
+\end{frame}
+
+
+\begin{frame}{Relocations in a shared library}
+    Kinds:
+\begin{itemize}
+    \item Links to locations in the same library (resolved by  static linker).
+    \item Symbol dependencies (usually in the different object).
+\end{itemize} 
+
+\end{frame}
+
+
+\subsection{Dynamic linker}
+
+\begin{frame}{\subsecname}
+
+The purpose of the dynamic linker is to:
+
+\begin{itemize}
+    \item Find and load dependencies. 
+    \item Perform relocation. 
+    \item Initialize the application and its dependencies and pass the
+        control to the application. Now, the program execution will start.
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+LOOKUP SCOPES: general information
+\end{frame}
+
+\subsection{Position Independent Code}
+
+\begin{frame}
+    MOTIVATE SHARING PARTS -> PIC
+    
+    Can we write in a manner we can execute the code no matter the loading address?
+\end{frame}
+
+\begin{frame}
+PIC what it is, how particular
+
+\end{frame}
+
+
+\begin{frame}
+PIC and relocations
+\end{frame}
+
+
+\subsection{Global Offset Table}
+
+\begin{frame}
+MOTIVATION
+\end{frame}
+
+\begin{frame}
+IDEA
+\end{frame}
+
+\begin{frame}
+NICE PICTURE
+\end{frame}
+
+
+\begin{frame}
+ASSEMBLY EXAMPLE
+\end{frame}
+
+\begin{frame}
+    OTHER TYPES OF RELOCATION!!
+\end{frame}
+
+
+\begin{frame}
+IN C, WHICH VARIABLES ARE ACCESSED USING GOT?
+\end{frame}
+
+
+\subsection{Procedure Linkage Table}
+
+
+\begin{frame}
+    MOTIVATION: why not just GOT?
+\end{frame}
+
+
+
+\begin{frame}
+NICE PICTURE
+\end{frame}
+
+
+
+\begin{frame}
+IN C, WHICH FUNCTIONS ARE ADDRESSED USING PLT?
+\end{frame}
+
+\subsection{Examples}
+
+\begin{frame}
+COMPLETE EXAMPLES IN C AND ASSEMBLY FROM THE BOOK
+\end{frame}
+
+
+\subsection{Visibility}
+\begin{frame}
+Kinds of visibility: local, static, global to exec, global to process
+\end{frame}
+
+\begin{frame}
+How to mark as public?
+\end{frame}
+
+\begin{frame}
+HIDE SYMBOLS BY DEFAULT (drep 18)
+\end{frame}
+
+
+\begin{frame}
+    EXPORT MAPS (drep 22)
+\end{frame}
+
+\subsection{Symbol Resolution}
+\begin{frame}
+
+    HOW SYMBOL RESOLVING WORKS: computing scopes
+
+    HASH TABLES FOR LOOKUP
+
+    BLOOM FILTER
+\end{frame}
+
+
+\section{Optimization}
+
+\begin{frame}
+GO WITH THE SECTION P.286
+\end{frame}
+
+
+
+\begin{frame}
+DSO CONSTRUCTORS AND DESTRUCTORS: HOW TO MAKE, IMPACT
+\end{frame}
+
+\begin{frame}
+    CHECK DREPPER's WORK : PAGE 13 
+\end{frame}
+
+\begin{frame}
+    CHECK DREPPER's WORK : PAGE 26, names
+\end{frame}
+
+\begin{frame}
+    \c{const char[] or const char*}
+
+\end{frame}
+
+
+
+\begin{frame}
+ARRAYS OF FUNCTION POINTERS
+\end{frame}
+\section{Code models}
+\subsection{What is code model}
+\subsection{The key difference}
+\subsection{Why not uniformly?}
+\subsection{PIC vs non-PIC}
+\subsection{Large, Small, Medium models}
+\subsection{Examples}
+
+
+
+%\begin{frame}[allowframebreaks]
+%\frametitle{References}
+%\bibliography{biblio} 
+%\end{frame}
+
+
+\iffalse
+Litterature:
+my book
+ABI
+Ulrich drepper
+\fi
+\end{document}
+
+
+\iffalse
 \begin{frame}[fragile]{Sections -- before linking}
     \begin{shell}
 > readelf -S symb.o
@@ -429,35 +878,5 @@ Number of section headers:         6
     \end{itemize}
 \end{frame}
 
-\begin{frame}{Mapping sections into memory}
-   
-    \includegraphics[scale=0.28]{images/segments-to-memory.png}
-\end{frame}
-\iffalse
-
-Start with studying ELF format because it is illustrative
-Structure of object files
-Sections, Segments 
-show symbol tables, relocation
-practice: needed tools, Example C, Example ASM
-
-Shared libraries 
 \fi
-
-
-
-%\begin{frame}[allowframebreaks]
-%\frametitle{References}
-%\bibliography{biblio} 
-%\end{frame}
-
-
-\iffalse
-Litterature:
-my book
-ABI
-Ulrich drepper
-\fi
-\end{document}
-
 
