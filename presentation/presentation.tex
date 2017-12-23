@@ -97,8 +97,6 @@ positioning,automata,positioning,calc}
 \end{frame}
 
 
-
-
 \begin{frame}{Exemplary environment}
     \begin{itemize} 
         \item  Intel 64 aka AMD64 aka x86\_64.
@@ -108,11 +106,42 @@ positioning,automata,positioning,calc}
 \end{itemize} 
 \end{frame}
 
-\begin{frame}{Contents}
-\tableofcontents
+
+\begin{frame}{Sources}
+
+    \begin{itemize}
+        \item ELF format specification  
+        \item System V Application Binary Interface
+        \item U.Drepper -- ``How to write shared libraries''
+
+        \item \url{http://amir.rachum.com/blog/2016/09/17/shared-libraries/}
+        \item I.Zhirkov -- ``Low-level programming: C, Assembly and Program Execution''
+\end{itemize} 
 
 \end{frame}
+\begin{frame}{Contents}
+    \tableofcontents[subsectionstyle=hide/hide/hide]
+\end{frame}
 
+\section{Prerequisites}
+
+\begin{frame}[fragile]{Assembly (NASM)} 
+    \begin{itemize}
+        \item  Registers:  \asm{rax, rbx, rcx,...}; \asm{rip}
+        \item  Sections: code (.text) separated from data (.data)
+        \item  \sh{label: instruction ; comment}
+        \item  Addressing modes:
+        \item  \asm{ db 1} | \asm{ dw 2}|  \asm{ dd 4} | \asm{ dq 8} 
+\begin{asmexample}
+    var: dq 42, 43, 44
+    mov rax, 42             ; imm
+    mov rax, var            ; address
+    mov rax, [var]          ; value (42)
+    mov rax, [var + 8]      ; value (43)
+    mov rax, [var + 8*rcx]  ; value (43)
+\end{asmexample}
+\end{itemize} 
+\end{frame}
 \section{Preface}
 \subsection{Relocation}
 
@@ -120,7 +149,7 @@ positioning,automata,positioning,calc}
     \begin{itemize}
  \item  Compiling is not trivial.  
 
- \item  Random Access Memory, linear addresses.  
+ \item  We have Random Access Memory, linear addresses.  
 
  \item  Challenge: carefully placing code and data in memory.
 
@@ -366,8 +395,8 @@ Typical sections:
   
     \begin{asmexample}
 section .data         ; global variables:
-x: dq 148842           ; int  x = 148842
-y: dq x                ; int* y = &x
+x: dq 148842          ; int  x = 148842
+y: dq x               ; int* y = &x
 
 extern somewhere      ; an external symbol 
 global _start         ; visible to other modules
@@ -466,7 +495,7 @@ Number of section headers:         6
 \end{frame}
 
 
-\begin{frame}[fragile]{Symbol table}
+\begin{frame}[fragile]{Symbol table before linking}
   
 
 \begin{shell}
@@ -505,7 +534,7 @@ start address 0x0
 \end{frame}
 
 
-\begin{frame}{Symbols before linking}
+\begin{frame}{Symbol table before linking}
     \begin{itemize}
 
         \item  Addresses are relative to section starts
@@ -604,32 +633,188 @@ mov rdx, y
 
 \subsection{Sections in linked file}
 
-\begin{frame}
-SECTIONS IN LINKED FILE
+\begin{frame}[fragile]{\subsecname}
+    
+\begin{shell}
+> ld -o symb symb.o
+\end{shell}
+    
+{
+\setlength{\tabcolsep}{12pt}
+
+    \begin{tabular}{l  l  l  l  l  l }
+        \textbf{No}  &  \textbf{Name} & \textbf{Size} & \textbf{Address} & \textbf{Offset} & \textbf{Align} \\\hline
+        1 & .text &      0x16& 0x4000b0 & 0xb0 & 16 \\
+        \multicolumn{6}{r}{\small \textsc{contents, alloc, load, readonly, code}}\\
+\hline
+        2 & .data  &      0x10 & 0x6000c8& 0xc8 & 4 \\
+        \multicolumn{6}{r}{\small \textsc{ contents, alloc, load, data}} \\
+\hline
+    \end{tabular} 
+}
+\pause
+    \begin{itemize}
+        \item Addresses are chosen.
+        \item No more \textsc{reloc} mark.
+
+    \end{itemize}
+    
 \end{frame}
 
 
-\begin{frame}
-SYMBOL TABLE IN LINKED FILE 
+\begin{frame}[fragile]{Symbol table after linkage}
+  
+
+\begin{shell}
+> objdump -tf symb
+Flags: EXEC_P, HAS_SYMS, D_PAGED
+start address 0x4000b0
+\end{shell}
+
+{
+\setlength{\tabcolsep}{10pt}
+    \begin{tabular}{l l l l}
+
+\textbf{Address}& \textbf{Type} & \textbf{Section} & \textbf{Name} \\
+\hline
+0x4000b0 & \texttt{ l    d } & .text &	 .text     \\
+0x6000c8 & \texttt{ l    d } & .data &	 .data     \\
+0x000000 & \texttt{ l    df} & *ABS* &	 symb.asm  \\
+0x6000c8 & \texttt{ l      } & .data &	 x         \\
+0x6000d0 & \texttt{ l      } & .data &	 y         \\
+0x000000 & \texttt{        } & *UND* &	 somewhere \\
+0x4000b0 & \texttt{ g      } & .text &   \_start    \\
+0x6000d8 & \texttt{ g      } & .data &	 \_\_bss\_start\\
+0x6000d8 & \texttt{ g      } & .data &	 \_edata    \\
+0x6000d8 & \texttt{ g      } & .data &	 \_end      \\
+        \hline
+\end{tabular}
+
+}
+
+\begin{itemize}
+\item[\texttt{l}] --  local
+
+\item[\texttt{g}] --  global (visible to other object files)
+
+\item[\texttt{d}] --  debug symbol
+
+\item[\texttt{f}] --  file name  
+
+\end{itemize}
+
 \end{frame}
 
 
-\subsection{Segments}
+\subsection{Program Headers}
 
-\begin{frame}
-    ONLY AFTER STATIC LINKING
-
-    WHAT ARE SEGMENTS CAPABLE OF (SEE ELF MANUAL)
+\begin{frame}{\subsecname}
+    \begin{itemize}
+\item  Created after static linking (shared / executable object files).
+\item  Each entry is a segment or other information for execution.
+    \end{itemize} 
 
 \end{frame}
 
-\begin{frame}{Program headers}
-    USING OBJDUMP TO SEE SEGMENTS
+\begin{frame}{Segments}
+    \textbf{Confusion: everything is called ``segment''}
+    \begin{itemize}
+        \item  Real/Protected mode segments.
+        \item  ELF segments
+        \item ``Segmentation fault''
+        \item  ... 
+    \end{itemize} 
+
+    ELF segment maps some sections to a region of memory.
 \end{frame}
 
 \begin{frame}{Mapping sections into memory}
     \includegraphics[scale=0.28]{images/segments-to-memory.png}
 \end{frame}
+
+\begin{frame}[fragile]{\subsecname}
+
+\begin{shell}
+> objdump -l symb
+\end{shell}
+
+{
+\setlength{\tabcolsep}{5pt}
+    \begin{tabular}{l l l l l l l}
+
+        \textbf{Type}& \textbf{Offset} & \textbf{VirtAddr} & \textbf{FileSize} & \textbf{MemSize} & \textbf{Flags} & \textbf{Align}  \\\hline
+        LOAD & 0    & 0x400000 & 0xc6 & 0xc6 & r-x & 0x200000 \\
+        LOAD & 0xc8 & 0x6000c8 & 0x10 & 0x10 & rw- & 0x200000 \\
+
+\hline
+\end{tabular}
+}
+
+\begin{shell}
+ Section to Segment mapping:
+  Segment Sections...
+   00     .text 
+   01     .data 
+\end{shell}
+
+Loader uses flags to set up permissions in page tables.
+\end{frame}
+
+
+\begin{frame}[fragile]{With more sections}
+
+
+\begin{asmexample}
+global _start       
+
+section .text        
+  _start: jmp _start  
+page 
+section .data      
+db 10
+
+section .rodata
+db 1
+
+section .bss
+resq 1024
+\end{asmexample}
+
+\end{frame}
+
+\begin{frame}[fragile]{With more sections}
+
+\begin{shell}
+> objdump -l symb
+\end{shell}
+
+{
+\setlength{\tabcolsep}{5pt}
+    \begin{tabular}{l l l l l l l}
+
+        \textbf{Type}& \textbf{Offset} & \textbf{VirtAddr} & \textbf{FileSize} & \textbf{MemSize} & \textbf{Flags} & \textbf{Align}  \\\hline
+        LOAD & 0    & 0x400000 & 0xb8 & 0xb8 & r-x & 0x200000 \\
+        LOAD & 0xb8 & 0x6000b8 & 0x01 & 0x2008 & rw- & 0x200000 \\
+
+\hline
+\end{tabular}
+}
+
+\begin{shell}
+ Section to Segment mapping:
+  Segment Sections...
+   00     .text .rodata 
+   01     .data .bss 
+\end{shell}
+
+\pause
+    \begin{itemize}
+        \item  .bss spares space in file
+        \item  .rodata has execution permissions but it seems to be fine.
+    \end{itemize} 
+\end{frame}
+
+
 
 \subsection{Static linking: summary}
 \begin{frame}{\subsecname}
@@ -638,38 +823,59 @@ SYMBOL TABLE IN LINKED FILE
 
     \begin{itemize}
         \item  Generates code with stubs for absolute addresses.
+        \item  Generates symbol table.
         \item  Generates relocation tables for sections in need.
 \end{itemize} 
 
     {\usebeamerfont{title} Static linker }
     \begin{itemize}
         \item Relocates pieces of code and data.
-        \item Creates program header table. 
         \item Fills in stubs found in relocation tables.
+        \item Creates program headers. 
     \end{itemize} 
 \end{frame}
 
+\subsection{Notes on C}
+
+\begin{frame}{\subsecname}
+    \begin{itemize}
+
+        \item  All symbols are global by default.
+        \item  \c{static} makes symbol local.
+        \item  Long string literals and constants are likely to be in .rodata.
+        \item  Zero initialized data in .bss (makes file smaller).
+        
+\end{itemize} 
+\end{frame}
+
+
+
 \section{Shared libraries}
 
-\subsection{What are dynamic libraries?}
+\subsection{What are shared libraries?}
 
 \begin{frame}{\subsecname}
-PAGE 103
+    \begin{itemize}
+        \item  Third type of ELF files.
+        \item Separate file, after linking.
+            \begin{itemize} 
+                \item  \texttt{.dll}, \texttt{.so}
+            \end{itemize} 
+        \item Can be updated separately.
+        \item Exposes some of global variables and functions.
+        \item Relocation is partially performed.
+        \item \textbf{Reusable by  other running processes}.
+        \item  Spares memory, but has additional costs when using.
+    \end{itemize}
 
+    Executable files use many libraries.
 \end{frame}
-
-\subsection{Advantages and disadvantages}
-\begin{frame}{\subsecname}
-PAGE 103
-
-\end{frame}
-
 
 \begin{frame}{Relocations in a shared library}
     Kinds:
 \begin{itemize}
     \item Links to locations in the same library (resolved by  static linker).
-    \item Symbol dependencies (usually in the different object).
+    \item Symbol dependencies (usually in the different object) -- performed by dynamic linker at runtime. 
 \end{itemize} 
 
 \end{frame}
@@ -677,93 +883,206 @@ PAGE 103
 
 \subsection{Dynamic linker}
 
-\begin{frame}{\subsecname}
+\begin{frame}{Dynamic linker's job}
 
-The purpose of the dynamic linker is to:
-
-\begin{itemize}
+\begin{enumerate}
     \item Find and load dependencies. 
     \item Perform relocation. 
-    \item Initialize the application and its dependencies and pass the
-        control to the application. Now, the program execution will start.
-\end{itemize}
+    \item Initialize the application and its dependencies 
+    \item Pass the control to the application. 
+\end{enumerate}
 \end{frame}
 
-\begin{frame}
-LOOKUP SCOPES: general information
+\begin{frame}[fragile]{How to find which libraries we need?}
+    \begin{itemize}
+        \item  Search locations: 
+    \begin{itemize}
+             
+        \item  rpath -- to be found in section .dynamic
+         \item  \sh{LD_LIBRARY_PATH} environment variable.
+         \item  runpath -- to be found in section .dynamic
+         \item  List in the file /etc/ld.so.conf. 
+         \item  Standards such as \texttt{/lib} 
+    \end{itemize}    
+        \item  Depth-first-search order, dependencies and their dependencies.
+        \item  Remember, there is an order on dependencies!
+        \item  Does not load the same library twice.
+    \end{itemize} 
 \end{frame}
 
+
+
+\begin{frame}{How to select a symbol?}
+
+    As in static linking, we search by name through the symbol tables.
+
+    Symbol can be defined in multiple objects, only one will exist in runtime.
+
+    Depending on a set of existing objects, its location may change.
+    
+    \textbf{Lookup scope of an object file} an ordered list of a subset of the loaded objects.
+
+\end{frame}
+
+
+\begin{frame}{Lookup scopes}
+    Last to first priority.
+
+        \begin{itemize}
+    \item  Global: the executable and all its dependencies recursively,
+        in a \emph{breadth-first search} order.
+
+                Starts with the executable.
+    \item  Legacy: look in metadata if \sh{DF_SYMBOLIC} flag is set.
+        If yes, local definitions are preferred.
+
+    \item Everything opened by \c{dlopen} call have a common additional separated scope. Not searched for normal lookups.
+ 
+    \end{itemize} 
+    
+    \sh{LD_PRELOAD} allows to add a library to global scope right after the executable itself.
+
+\end{frame}
 \subsection{Position Independent Code}
 
-\begin{frame}
-    MOTIVATE SHARING PARTS -> PIC
-    
-    Can we write in a manner we can execute the code no matter the loading address?
+\begin{frame}{How to perform relocations?}
+    \begin{itemize}
+        \item  Relocations in runtime lead to patching addresses.
+        \item  Modified pages can not be shared, hence the advantages of 
+            shared libraries pale.
+    \end{itemize} 
+        Can we write in a manner we can execute the code no matter the loading address?
+    \end{frame}
+
+
+\begin{frame}{Sharing library between processes}
+    \begin{itemize}
+ \item  .data and .bss  can not be shared anyway (each process should have its own global variables).
+ \item  .text can be shared if consists of \textbf{position independent code (PIC)}.
+ \item  .rodata can be shared if it has no relocations (e.g. an address of a variable).
+\end{itemize} 
+
 \end{frame}
 
-\begin{frame}
-PIC what it is, how particular
+\begin{frame}{RIP-relative addressing}
+    RIP -- register holding the address of current instruction (Program Counter)
 
-\end{frame}
+    Intel 64 supports RIP-relative addressing out-of-the-box. 
 
+    Can we just change all addressing to RIP-relative? 
+    \begin{itemize}
+         \item  Works for addresses of \emph{local} variables and functions: we
+             know the offsets between current position in code and everything
+             from the same object file.
 
-\begin{frame}
-PIC and relocations
+         \item  \textbf{Not for exported or imported symbols}: we do not know which object will provide them.
+
+    \end{itemize} 
+
+    Solution: add level of indirection using \textbf{Global Offset Table}.
+    %FIXME illustration?
 \end{frame}
 
 
 \subsection{Global Offset Table}
 
-\begin{frame}
-MOTIVATION
+\begin{frame}{\subsecname}
+
+    \begin{itemize}
+        \item A table storing addresses of global variables and functions.
+        \item Unique per object file. 
+        \item  Dynamic linker fills it with correct addresses.
+\end{itemize}
+
 \end{frame}
-
-\begin{frame}
-IDEA
-\end{frame}
-
-\begin{frame}
-NICE PICTURE
-\end{frame}
-
-
-\begin{frame}
-ASSEMBLY EXAMPLE
-\end{frame}
-
-\begin{frame}
-    OTHER TYPES OF RELOCATION!!
+\begin{frame}[fragile]{\subsecname}
+    \begin{tabular}{l l}
+    \includegraphics[height=0.9\textheight]{images/got.png} 
+    &
+        {Accessing a global variable \texttt{x} }
+    
+    \end{tabular}
 \end{frame}
 
 
-\begin{frame}
-IN C, WHICH VARIABLES ARE ACCESSED USING GOT?
+\begin{frame}{Coding time}
+        NASM uses the \asm{rel} keyword to achieve \asm{rip}-relative
+        addressing. This does not involve GOT nor PLT. 
+    \begin{itemize} 
+        \item  Minimal assembly example.  
+        \item  Note a problem with hardcoded linker name.
+        \item  Using \texttt{ldd}
+\end{itemize} 
+\end{frame}
+
+\begin{frame}{Types of relocations}
+   All are processor-specific.
+
+    Tells how specifically should we alter an instruction operand.
+    
+    \sh{R_X86_64_64} for ``replace with immediate address'', but others are 
+    more complex.
+
 \end{frame}
 
 
 \subsection{Procedure Linkage Table}
 
 
-\begin{frame}
-    MOTIVATION: why not just GOT?
+\begin{frame}{\subsecname}
+
+    Calling globally available procedures is based on an augmented GOT.
+
+    There are many procedures exported, few used. 
+
+    We do not want the linker to resolve them until needed.
+
+    So, implement a lazy binding using \textbf{Procedure Linkage Table}
 \end{frame}
 
 
 
-\begin{frame}
-NICE PICTURE
+\begin{frame}{\subsecname{} -- before resolving}
+    \includegraphics[height=0.9\textheight]{images/plt-before.png} 
+\end{frame}
+
+\begin{frame}{\subsecname{} -- after resolving}
+    \includegraphics[height=0.9\textheight]{images/plt-after.png} 
 \end{frame}
 
 
+\subsection{Symbol addressing summary}
 
-\begin{frame}
-IN C, WHICH FUNCTIONS ARE ADDRESSED USING PLT?
+\begin{frame}{\subsecname}
+    \begin{itemize}
+        \item  Writing and exploring a shared library in C.
+        \item  Writing and exploring a shared library in Assembly.
+    \end{itemize} 
 \end{frame}
 
-\subsection{Examples}
 
-\begin{frame}
-COMPLETE EXAMPLES IN C AND ASSEMBLY FROM THE BOOK
+\begin{frame}{\subsecname}
+Assuming the main executable file is not PIC.
+
+The symbol can be:
+
+\begin{enumerate}
+    \item Defined in executable and used locally there -- trivial.
+        
+    \item Defined in dynamic library and unavailable to external objects.
+
+        In presence of PIC, it is done by using \asm{rip}-relative addressing
+        (for data) or relative offsets (for function calls). 
+
+    \item Defined in executable and used globally.
+        
+        Requires  GOT/PLT  if the caller is external. 
+
+    \item Defined in dynamic library and used globally.
+
+        Requires GOT/PLT.
+\end{enumerate} 
+
 \end{frame}
 
 
@@ -785,18 +1104,19 @@ HIDE SYMBOLS BY DEFAULT (drep 18)
     EXPORT MAPS (drep 22)
 \end{frame}
 
-\subsection{Symbol Resolution}
-\begin{frame}
+\section{Optimization}
 
-    HOW SYMBOL RESOLVING WORKS: computing scopes
+\begin{frame}{\subsecname}
+    Performance boosters already inside ELF files.
 
-    HASH TABLES FOR LOOKUP
+    \begin{itemize}
+        \item Hash map: symbols $\mapsto$ addresses.
 
-    BLOOM FILTER
+        \item Bloom filter (does this object file define a symbol $x$?).
+    \end{itemize} 
+    %FIXME illustrate with READELF
 \end{frame}
 
-
-\section{Optimization}
 
 \begin{frame}
 GO WITH THE SECTION P.286
@@ -826,13 +1146,71 @@ DSO CONSTRUCTORS AND DESTRUCTORS: HOW TO MAKE, IMPACT
 \begin{frame}
 ARRAYS OF FUNCTION POINTERS
 \end{frame}
+
+\section{Overriding symbols}
+
+\subsection{Using \texttt{LD\_PRELOAD}}
+
+
+\begin{frame}{\subsecname}
+    
+   \texttt{LD\_PRELOAD} is an environment variable.
+
+    Stores path to libraries to load before anything else. 
+
+    These have the highest priority.
+\end{frame}
+
+
+\begin{frame}{Example: overriding glibc functions}
+    \texttt{glibc} is usually dynamically linked.
+
+    Let us override a function!
+
+\end{frame}
+
+
 \section{Code models}
-\subsection{What is code model}
-\subsection{The key difference}
-\subsection{Why not uniformly?}
-\subsection{PIC vs non-PIC}
-\subsection{Large, Small, Medium models}
-\subsection{Examples}
+\subsection{What is  a code model}
+
+\begin{frame}[fragile]{\subsecname}
+    In our case, \textbf{code model} is a mode of generating instructions related to addressing.
+
+    RIP-relative addresses are limited by offsets of 32 bits. What if we need more?
+
+    Usually it is enough; no need to waste more bytes clogging the instruction cache.
+
+    Otherwise we use multiple instructions, like:
+
+\begin{asmexample}
+    mov rax, 0x12345
+    mov rcx, [rax]
+\end{asmexample}
+
+    gcc option: \sh{ -mcmodel=small/medium/large}
+\end{frame}
+
+\subsection{Six models}
+
+\begin{frame}
+
+Besides kernel-related, there are six code models:
+
+    \begin{itemize}
+
+        \item  PIC or Non-PIC modifier;
+            \begin{itemize}
+ 
+        \item  Small -- what we are used to
+        \item  Large -- all offsets are now 64 bit, performance is hit.
+        \item  Medium -- like small, but selected huge arrays are addressed like in large.
+        \end{itemize} 
+\end{itemize} 
+
+    Examples follow.
+\end{frame}
+
+
 
 
 
