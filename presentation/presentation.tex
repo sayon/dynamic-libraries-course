@@ -769,7 +769,6 @@ global _start
 
 section .text        
   _start: jmp _start  
-page 
 section .data      
 db 10
 
@@ -991,7 +990,7 @@ resq 1024
     \begin{itemize}
         \item A table storing addresses of global variables and functions.
         \item Unique per object file. 
-        \item  Dynamic linker fills it with correct addresses.
+        \item Dynamic linker fills it with correct addresses.
 \end{itemize}
 
 \end{frame}
@@ -1005,18 +1004,13 @@ resq 1024
 \end{frame}
 
 
-\begin{frame}{Coding time}
+\begin{frame}{\texttt{rip}-relative addressing}
         NASM uses the \asm{rel} keyword to achieve \asm{rip}-relative
         addressing. This does not involve GOT nor PLT. 
-    \begin{itemize} 
-        \item  Minimal assembly example.  
-        \item  Note a problem with hardcoded linker name.
-        \item  Using \texttt{ldd}
-\end{itemize} 
 \end{frame}
 
-\begin{frame}{Types of relocations}
-   All are processor-specific.
+\begin{frame}{Relocation types}
+    All are processor-specific.
 
     Tells how specifically should we alter an instruction operand.
     
@@ -1024,6 +1018,34 @@ resq 1024
     more complex.
 
 \end{frame}
+\begin{frame}[fragile]{Relocation types for Intel 64}
+    
+    {
+\small
+\setlength{\parindent}{-0.5cm}
+
+\begin{shell}
+R_X86_64_NONE       No reloc 
+R_X86_64_64         Direct 64 bit  
+R_X86_64_PC32       PC relative 32 bit signed 
+R_X86_64_GOT32      32 bit GOT entry 
+R_X86_64_PLT32      32 bit PLT address 
+R_X86_64_COPY       Copy symbol at runtime 
+R_X86_64_GLOB_DAT   Create GOT entry 
+R_X86_64_JUMP_SLOT  Create PLT entry 
+R_X86_64_RELATIVE   Adjust by program base 
+R_X86_64_GOTPCREL   32 bit signed pc rel offset to GOT 
+R_X86_64_32         Direct 32 bit zero extended 
+R_X86_64_32S        Direct 32 bit sign extended 
+R_X86_64_16         Direct 16 bit zero extended 
+R_X86_64_PC16       16 bit sign extended pc relative 
+R_X86_64_8          Direct 8 bit sign extended  
+R_X86_64_PC8        8 bit sign extended pc relative 
+\end{shell}
+}
+\end{frame}
+
+
 
 
 \subsection{Procedure Linkage Table}
@@ -1042,66 +1064,149 @@ resq 1024
 
 
 
-\begin{frame}{\subsecname{} -- before resolving}
+\begin{frame}[fragile]{PLT -- before resolving}
     \includegraphics[height=0.9\textheight]{images/plt-before.png} 
 \end{frame}
 
-\begin{frame}{\subsecname{} -- after resolving}
+\begin{frame}[fragile]{PLT -- after resolving}
     \includegraphics[height=0.9\textheight]{images/plt-after.png} 
 \end{frame}
 
+\begin{frame}[fragile]{PLT}
+    \begin{itemize}
+      \item  Resolving happens on first call.
+      \item  Later calls have penalty of an extra jump.
+      \item  Can be forced on load (see \sh{LD_BIND_NOW} env var).
+      \item  PLT can be omitted with \texttt{-f-no-plt} (GCC 6).
+
+    \end{itemize} 
+\end{frame}
 
 \subsection{Symbol addressing summary}
 
 \begin{frame}{\subsecname}
-    \begin{itemize}
-        \item  Writing and exploring a shared library in C.
-        \item  Writing and exploring a shared library in Assembly.
-    \end{itemize} 
+Assuming the main executable file is PIC.
+
+The symbol can be defined in an object and be:
+
+\begin{itemize}
+
+    \item exported (process-global):
+    
+        Requires GOT/PLT
+
+    \item local to the object:
+
+        \asm{rip}-relative addressing (for data) or relative offsets (for
+        function calls). 
+
+\end{itemize} 
+
 \end{frame}
-
-
 \begin{frame}{\subsecname}
-Assuming the main executable file is not PIC.
+    Assuming the main executable file is \textbf{not} PIC.
 
 The symbol can be:
 
-\begin{enumerate}
-    \item Defined in executable and used locally there -- trivial.
+\begin{itemize}
+
+    \item \textbf{Local to main program}: absolute addresses.
         
-    \item Defined in dynamic library and unavailable to external objects.
+    \item \textbf{Local to PIC shared library}: 
+        \asm{rip}-relative addressing (for data) or relative offsets (for
+        function calls). 
 
-        In presence of PIC, it is done by using \asm{rip}-relative addressing
-        (for data) or relative offsets (for function calls). 
-
-    \item Defined in executable and used globally.
+    \item \textbf{Defined in executable, used globally.}
         
-        Requires  GOT/PLT  if the caller is external. 
+        Accessed directly from the executable, requires GOT/PLT entry in libraries.
 
-    \item Defined in dynamic library and used globally.
+    \item \textbf{Defined in dynamic library and used globally.}
+        
+        MAY BE accessed directly in executable (optimization), requires GOT/PLT entry in libraries.
+        \textbf{Usually ends up in main program during execution, because
+        the executable is always first in lookup scope}. See example \sh{var-moved-to-main}.
 
-        Requires GOT/PLT.
-\end{enumerate} 
+
+
+\end{itemize} 
+
+\end{frame}
+
+\begin{frame}{Coding time}
+    \begin{itemize}
+        \item Minimal assembly example (\texttt{ex1}); explore with readelf.
+        \item Note a problem with hardcoded linker name.
+        \item Using \texttt{ldd}
+        \item Simple library in C (\texttt{ex5}). 
+        \item Writing and exploring a shared library in Assembly (\texttt{ex2}, (\texttt{ex3}).
+        \item Interfacing an assembly library with C (\texttt{ex4}).
+    \end{itemize} 
+\end{frame}
+
+\begin{frame}[fragile]{Constructors and destructors}
+
+
+    \begin{cexample}
+void
+__attribute ((constructor))
+init_function (void)
+{ ...  }
+
+void
+__attribute ((destructor))
+fini_function (void)
+{ ...  }
+\end{cexample}
+
+    Order of execution: topologically sorted objects w.r.t. dependencies.
+    
+    Slow, repeat for destructor execution order.
+   
+    \textbf{ Do not override \c{_fini} and \c{_init}, they are used!}.
+\end{frame}
+
+
+
+\subsection{Visibility control}
+\begin{frame}[fragile]{\subsecname}
+
+    How to make global-global and local-global symbols? 
+
+GCC has four visibility types.
+
+Control with: 
+
+\begin{shell}
+> gcc -fvisibility=hidden ... # hide all symbols 
+\end{shell}
+
+Explicitly visible:
+
+
+\begin{cexample}
+int __attribute__(( visibility( "default" ) ))
+func(int x) { return 42; }
+\end{cexample}
 
 \end{frame}
 
 
-\subsection{Visibility}
-\begin{frame}
-Kinds of visibility: local, static, global to exec, global to process
-\end{frame}
-
-\begin{frame}
-How to mark as public?
-\end{frame}
-
-\begin{frame}
-HIDE SYMBOLS BY DEFAULT (drep 18)
-\end{frame}
+\begin{frame}[fragile]{Other possibilities}
+    \begin{itemize}
+ \item  Export maps (linker scripts). 
+     \begin{itemize}
+        \item  Careful with C++ because of mangling.
+     \end{itemize} 
+     \item Enclose in:
 
 
-\begin{frame}
-    EXPORT MAPS (drep 22)
+\begin{cexample}
+#pragma GCC visibility push(hidden)
+...
+#pragma GCC visibility pop 
+\end{cexample}
+
+\end{itemize} 
 \end{frame}
 
 \section{Optimization}
@@ -1112,40 +1217,111 @@ HIDE SYMBOLS BY DEFAULT (drep 18)
     \begin{itemize}
         \item Hash map: symbols $\mapsto$ addresses.
 
-        \item Bloom filter (does this object file define a symbol $x$?).
+            \texttt{readelf -I}
+
+        \item GNU extension: add Bloom filter (does this object even define a symbol $x$?).
     \end{itemize} 
-    %FIXME illustrate with READELF
 \end{frame}
 
 
-\begin{frame}
-GO WITH THE SECTION P.286
-\end{frame}
+\begin{frame}{-fPIC vs -fpic}
+    On Intel 64 they are the same.
 
+    There exist architectures where \texttt{-fpic} produces smaller and faster code (but there are architecture-dependent limitations).
 
-
-\begin{frame}
-DSO CONSTRUCTORS AND DESTRUCTORS: HOW TO MAKE, IMPACT
-\end{frame}
-
-\begin{frame}
-    CHECK DREPPER's WORK : PAGE 13 
-\end{frame}
-
-\begin{frame}
-    CHECK DREPPER's WORK : PAGE 26, names
-\end{frame}
-
-\begin{frame}
-    \c{const char[] or const char*}
 
 \end{frame}
 
+\begin{frame}{General advice}
+    \begin{itemize}
+        \item  ALWAYS use \texttt{-fpic} or \texttt{-fPIC} on libraries. Otherwise certain optimizations can screw your code semantics.
+        \item  Get rid of relocations in .data and .rodata.
+        \item  Hide everything you can (visibility).
+        \item  Less objects (initializers/finalizers, loading, lookup scope...)
+        \item  Symbol table length might be not optimal.
+        \item  Comparing long strings is costly (C++ names are very long).
+        \item  Place everything you can in .rodata
+\end{itemize} 
 
-
-\begin{frame}
-ARRAYS OF FUNCTION POINTERS
 \end{frame}
+
+\begin{frame}[fragile]{Relocations and data types -- 1}
+
+\begin{cexample}
+char* hello = "hey";
+\end{cexample}
+
+OR
+
+\begin{cexample}
+const char hello[] = "hey";
+\end{cexample}
+
+?
+
+
+\end{frame}
+
+\begin{frame}[fragile]{Relocations and data types -- 2}
+
+\begin{cexample}
+static const char *msgs[] = {
+    [ERR1] = "message for err1",
+    [ERR2] = "message for err2",
+    [ERR3] = "message for err3"
+};
+\end{cexample}
+
+has 3 relocations.
+
+\begin{cexample}
+static const char msgs[][17] = {
+    [ERR1] = "message for err1",
+    [ERR2] = "message for err2",
+    [ERR3] = "message for err3"
+};
+\end{cexample}
+
+    has none (but wastes memory if different elements length OR ERR1..3 are 
+    not consecutive or far from zero).
+
+
+\end{frame}
+
+
+\begin{frame}[fragile]{Relocation and data types -- 2.1}
+
+
+\begin{cexample}
+static const char msgstr[] =
+    "message for err1\0"
+    "message for err2\0"
+    "message for err3";
+
+static const size_t msgidx[] = {
+    0,
+    sizeof ("message for err1"),
+    sizeof ("message for err1")
+    + sizeof ("message for err2")
+};
+
+const char *errstr (int nr) {
+    return msgstr + msgidx[nr];
+}
+\end{cexample}
+
+\end{frame}
+\begin{frame}[fragile]{Getting rid of PLT}
+    PLT is not used if a symbol is local-global.
+    \begin{itemize}
+        \item  Adapters;
+
+        \item  Aliases (see example \texttt{ex-alias}).
+
+\end{itemize} 
+
+\end{frame}
+
 
 \section{Overriding symbols}
 
@@ -1158,15 +1334,14 @@ ARRAYS OF FUNCTION POINTERS
 
     Stores path to libraries to load before anything else. 
 
-    These have the highest priority.
+    These have the highest priority (after the executable).
 \end{frame}
 
 
 \begin{frame}{Example: overriding glibc functions}
     \texttt{glibc} is usually dynamically linked.
 
-    Let us override a function!
-
+    Let us override a function! (see \texttt{override} example).
 \end{frame}
 
 
@@ -1213,48 +1388,4 @@ Besides kernel-related, there are six code models:
 
 
 
-
-%\begin{frame}[allowframebreaks]
-%\frametitle{References}
-%\bibliography{biblio} 
-%\end{frame}
-
-
-\iffalse
-Litterature:
-my book
-ABI
-Ulrich drepper
-\fi
 \end{document}
-
-
-\iffalse
-\begin{frame}[fragile]{Sections -- before linking}
-    \begin{shell}
-> readelf -S symb.o
-    \end{shell}
-
-{\small
-\setlength{\parindent}{-0.5cm}
-\setlength{\tabcolsep}{3pt}
-\begin{tabular}{l l l l l l l l l l }
-\textbf{Name}& \textbf{Type} & \textbf{Address} & \textbf{Offset} & \textbf{Size}& \textbf{EntSize} & \textbf{Flags} & \textbf{Link} & \textbf{Info} & \textbf{Align} \\
-.data & PROGBITS   & 0 & 240  & 10 & 0 & WA & 0 & 0 & 4 \\
-.text & PROGBITS   & 0 & 250  & 16 & 0 & AX & 0 & 0 & 16 \\
-.shstrtab & STRTAB & 0 & 270  & 3d & 0 & 0  & 0 & 0 & 1  \\
-.symtab   & SYMTAB & 0 & 2b   & c0 & 18& 0  & 5 & 6 & 4  \\
-.strtab   & STRTAB & 0 & 370  & 2d & 0 & 0  & 0 & 0 & 1  \\
-.rela.data& RELA   & 0 & 3a0  & 18 & 18& 0  & 4 & 1 & 4 \\
-.rela.text& RELA   & 0 & 3c0  & 30 & 18& 0  & 4 & 2 & 4 \\
-
-\end{tabular}
-}
-\pause
-    \begin{itemize}
-        \item  All addresses are 0
-    \end{itemize}
-\end{frame}
-
-\fi
-
